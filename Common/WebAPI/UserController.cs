@@ -12,7 +12,13 @@ namespace Common.WebAPI
 {
     public class UserController : BaseController
     {
+        /// <summary>
+        /// login and get token
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
         [AllowAnonymous]
+        [HttpPost]
         public async Task<IActionResult> Login(LoginRequest request)
         {
             string token = JwtToken.CreateToken(request.userName,request.password);

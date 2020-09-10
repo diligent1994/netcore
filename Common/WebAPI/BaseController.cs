@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace Common.WebAPI
 {
+    [Produces("application/json")]
     [ApiController]
     [Route("api/[controller]/[action]")]
     public class BaseController : ControllerBase
