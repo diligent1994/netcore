@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Autofac;
@@ -83,6 +85,12 @@ namespace WebHost
                     Title = "Netcore API",
                     Description = "A simple example framework of ASP.NET Core Web API",
                 });
+
+                var xmls = Directory.CreateDirectory(AppContext.BaseDirectory).GetFiles("*.xml", SearchOption.AllDirectories);
+                foreach (var xml in xmls)
+                    c.IncludeXmlComments(xml.FullName, true);        //添加控制器层注释（true表示显示控制器注释）
+
+                c.CustomSchemaIds(x => x.FullName);    //防止重名
             });
         }
 

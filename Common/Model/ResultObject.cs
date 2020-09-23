@@ -19,7 +19,7 @@ namespace Common.Model
     {
         #region Fileds
 
-        protected static JsonWriterSettings jsonWriterSettings = new JsonWriterSettings() { OutputMode = JsonOutputMode.Strict, MaxSerializationDepth = 1000 };
+        protected static JsonWriterSettings jsonWriterSettings = new JsonWriterSettings() { OutputMode = JsonOutputMode.CanonicalExtendedJson, MaxSerializationDepth = 1000 };
 
         protected HttpRequest _request;
 
@@ -64,7 +64,7 @@ namespace Common.Model
             this.Data = data;
         }
 
-        public ResultObject(HttpRequest request, int status, string message, T data = default(T))
+        public ResultObject(HttpRequest request, int status, string message, T data = default)
             : this(request, data)
         {
             this.Status = status;
@@ -107,18 +107,14 @@ namespace Common.Model
 
         public static Task WriteByteAsync(ActionContext context, byte[] data)
         {
-            using (MemoryStream ms = new MemoryStream(data))
-            {
-                return WriteByte(context, ms, data);
-            }
+            using MemoryStream ms = new MemoryStream(data);
+            return WriteByte(context, ms, data);
         }
 
         public static Task WriteFile(ActionContext context, string targetFile)
         {
-            using (FileStream fs = new FileStream(targetFile, FileMode.Open, FileAccess.Read))
-            {
-                return WriteByte(context, fs);
-            }
+            using FileStream fs = new FileStream(targetFile, FileMode.Open, FileAccess.Read);
+            return WriteByte(context, fs);
         }
 
 

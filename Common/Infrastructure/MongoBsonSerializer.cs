@@ -46,7 +46,7 @@ namespace Common.Infrastructure
         {
             this.m_jsonSerializerSettings = new JsonWriterSettings()
             {
-                OutputMode = JsonOutputMode.Strict,
+                OutputMode = JsonOutputMode.CanonicalExtendedJson,
                 MaxSerializationDepth = 1000
             };
         }
@@ -84,28 +84,26 @@ namespace Common.Infrastructure
         {
             if (value == null) throw new ArgumentNullException("value");
 
-            using (var streamWriter = new StringWriter())
+            using var streamWriter = new StringWriter();
+            using (var bsonWriter = new CustomerJsonWriter(streamWriter, this.m_jsonSerializerSettings, isISODateTime))
             {
-                using (var bsonWriter = new CustomerJsonWriter(streamWriter, this.m_jsonSerializerSettings, isISODateTime))
+                IBsonSerializer serializer = BsonSerializer.LookupSerializer(typeof(T));
+                if (serializer.ValueType != typeof(T))
                 {
-                    IBsonSerializer serializer = BsonSerializer.LookupSerializer(typeof(T));
-                    if (serializer.ValueType != typeof(T))
-                    {
-                        var message = string.Format("Serializer type {0} value type does not match document types {1}.",
-                                                     serializer.GetType().FullName,
-                                                     typeof(T).FullName);
-                        throw new ArgumentException(message, "serializer");
-                    }
-
-                    Action<BsonSerializationContext.Builder> configurator = null;
-                    var context = BsonSerializationContext.CreateRoot(bsonWriter, configurator);
-                    BsonSerializationArgs args = new BsonSerializationArgs(typeof(T), false, true); //default(BsonSerializationArgs);
-                    serializer.Serialize(context, args, value);
+                    var message = string.Format("Serializer type {0} value type does not match document types {1}.",
+                                                 serializer.GetType().FullName,
+                                                 typeof(T).FullName);
+                    throw new ArgumentException(message, "serializer");
                 }
-                streamWriter.Flush();
 
-                return streamWriter.ToString();
+                Action<BsonSerializationContext.Builder> configurator = null;
+                var context = BsonSerializationContext.CreateRoot(bsonWriter, configurator);
+                BsonSerializationArgs args = new BsonSerializationArgs(typeof(T), false, true); //default(BsonSerializationArgs);
+                serializer.Serialize(context, args, value);
             }
+            streamWriter.Flush();
+
+            return streamWriter.ToString();
         }
 
         #endregion
@@ -169,12 +167,7 @@ namespace Common.Infrastructure
         public CustomerJsonWriter(TextWriter writer, JsonWriterSettings settings, bool isIsoDateTime = false)
             : base(settings)
         {
-            if (writer == null)
-            {
-                throw new ArgumentNullException("writer");
-            }
-
-            _textWriter = writer;
+            _textWriter = writer ?? throw new ArgumentNullException("writer");
             _jsonWriterSettings = settings; // already frozen by base class
             _context = new JsonWriterContext(null, ContextType.TopLevel, "");
             State = BsonWriterState.Initial;
@@ -250,7 +243,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write("{{ \"$binary\" : \"{0}\", \"$type\" : \"{1}\" }}", Convert.ToBase64String(bytes), ((int)subType).ToString("x2"));
                     break;
 
@@ -473,7 +466,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write(value);
                     break;
 
@@ -545,7 +538,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write("{ \"$maxKey\" : 1 }");
                     break;
 
@@ -572,7 +565,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write("{ \"$minKey\" : 1 }");
                     break;
 
@@ -619,7 +612,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     //  _textWriter.Write("{{ \"$oid\" : \"{0}\" }}", BsonUtils.ToHexString(bytes));
                     _textWriter.Write("\"{0}\"", BsonUtils.ToHexString(bytes));
                     break;
@@ -651,7 +644,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write("{{ \"$regex\" : \"{0}\", \"$options\" : \"{1}\" }}", EscapedString(pattern), EscapedString(options));
                     break;
 
@@ -761,7 +754,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write("{{ \"$timestamp\" : {{ \"t\" : {0}, \"i\" : {1} }} }}", secondsSinceEpoch, increment);
                     break;
 
@@ -788,7 +781,7 @@ namespace Common.Infrastructure
             WriteNameHelper(Name);
             switch (_jsonWriterSettings.OutputMode)
             {
-                case JsonOutputMode.Strict:
+                case JsonOutputMode.CanonicalExtendedJson:
                     _textWriter.Write("{ \"$undefined\" : true }");
                     break;
 
@@ -923,15 +916,14 @@ namespace Common.Infrastructure
             }
             else
             {
-                string uuidConstructorName;
-                switch (guidRepresentation)
+                var uuidConstructorName = guidRepresentation switch
                 {
-                    case GuidRepresentation.CSharpLegacy: uuidConstructorName = "CSUUID"; break;
-                    case GuidRepresentation.JavaLegacy: uuidConstructorName = "JUUID"; break;
-                    case GuidRepresentation.PythonLegacy: uuidConstructorName = "PYUUID"; break;
-                    case GuidRepresentation.Standard: uuidConstructorName = "UUID"; break;
-                    default: throw new BsonInternalException("Unexpected GuidRepresentation");
-                }
+                    GuidRepresentation.CSharpLegacy => "CSUUID",
+                    GuidRepresentation.JavaLegacy => "JUUID",
+                    GuidRepresentation.PythonLegacy => "PYUUID",
+                    GuidRepresentation.Standard => "UUID",
+                    _ => throw new BsonInternalException("Unexpected GuidRepresentation"),
+                };
                 var guid = GuidConverter.FromBytes(bytes, guidRepresentation);
                 return string.Format("{0}(\"{1}\")", uuidConstructorName, guid.ToString());
             }

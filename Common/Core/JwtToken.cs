@@ -11,9 +11,9 @@ namespace Common.Core
 {
     public class JwtToken
     {
-        public const string SECURITY_KEY = "keyeware";
+        public const string SECURITY_KEY = "dqcompanyofnetcore";
 
-        public const string KEY = "ewaresoft";
+        public const string KEY = "dq";
 
         public static string CreateToken(string userName, string pwd)
         {

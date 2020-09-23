@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Common.Model
 {
-    public class MongoEntity
+    public class BaseEntity
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
